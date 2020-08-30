@@ -1,22 +1,30 @@
 import socket
+import sys
 
-addr = ("", 9000)
+PORT = 9000
+HOST = ""
+addr = (HOST, PORT)
 
 sock = socket.socket(
     socket.AF_INET,
-    socket.SOCK_STREAM | socket.SOCK_NONBLOCK
-)
+    socket.SOCK_STREAM)
 
 #ao terminar o loop, fecha automaticamente a conexão
 with sock as s:
     s.bind(addr)
     s.listen()
-    conn, addr = s.accept()
+    if s is None:
+        print("Erro ao abrir socket")
+        sys.exit(1)
+    print(f"Escutando por conexões na porta {PORT}")
+    conn, remote_addr = s.accept()
     with conn:
-        msg = conn.recv(2**10)
+        print(f"Conexão com {remote_addr[0]}:{remote_addr[1]} estabelecida")
+        msg = conn.recv(1024)
         while True:
-            if msg == "CLOSE":
-                conn.sendall(b"'CLOSE' enviado. Encerrando conexão...")
+            print(f"Recebi: {msg.decode()}")
+            if msg.decode() == "CLOSE":
                 break
             conn.sendall(msg)  
+            msg = conn.recv(1024)
 
