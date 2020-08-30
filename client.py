@@ -14,16 +14,15 @@ with sock as s:
         conn = s.getpeername()
         print(f"Conectado a {conn[0]}:{conn[1]}")
         while True: 
-            print("Digite a mensagem: ")
-            msg = input()
+            msg = input("Digite a mensagem: ")
             if msg == "CLOSE":
-                print("Encerrando conexão...")
+                print("\nEncerrando conexão...")
                 s.sendall(b"CLOSE")
                 break
             s.sendall(msg.encode())
             echo = s.recv(1024)
             print(f"Resposta recebida: {echo.decode()}")
     except (KeyboardInterrupt, SystemExit):
-        print("Encerrando conexão...")
+        print("\nEncerrando conexão...")
         s.sendall(b"CLOSE")
         
