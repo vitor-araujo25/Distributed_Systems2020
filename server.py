@@ -20,11 +20,10 @@ with sock as s:
     conn, remote_addr = s.accept()
     with conn:
         print(f"Conexão com {remote_addr[0]}:{remote_addr[1]} estabelecida")
-        msg = conn.recv(1024)
         while True:
+            msg = conn.recv(1024)
             print(f"Recebi: {msg.decode()}")
             if msg.decode() == "CLOSE":
                 break
-            conn.sendall(msg)  
-            msg = conn.recv(1024)
+            conn.sendall(msg)
 
