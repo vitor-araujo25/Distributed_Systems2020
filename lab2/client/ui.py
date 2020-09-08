@@ -2,29 +2,33 @@ import socket
 import json
 
 def interaction_loop(sock):
-    ALL_MESSAGES_COLLECTED = False
-
     while True:
+        ALL_MESSAGES_COLLECTED = False
         file_name = input("Type the file name: ")
         if file_name == "":
             break
         sock.sendall(file_name.encode())
 
+        #starting message collection loop
+        #If server response is larger than 1024 bytes, segmentation will occur,
+        #in which case, this loop will iterate until msg_buf has a valid JSON object
         msg_buf = ""
         while not ALL_MESSAGES_COLLECTED:
             response_json = sock.recv(1024)
-            #print(f"DEBUG: msg received: {response_json.decode()}")
-            if response_json.decode() == "ERRO":
+            response_json = response_json.decode()
+            if response_json == "ERROR":
                 print("The file you chose appears to not exist. Try again.")
                 break
             try:
-                msg_buf += response_json.decode('utf-8')
+                msg_buf += response_json
                 word_list = json.loads(msg_buf)
             except json.JSONDecodeError:
                 continue
             else:
                 ALL_MESSAGES_COLLECTED = True         
-        else:       
+        else: 
+            #this block will only execute if the while loop 
+            #exited successfully (not via break call)      
             filtered_word_list = process_word_list(word_list)
             render(filtered_word_list, file_name)
         

@@ -39,12 +39,11 @@ def start(socket_tuple):
                     try:
                         word_count = core.count_words(file_name)
                     except OSError as e:
-                        conn.sendall(b"ERRO")
-                        print(f"DEBUG: {e}")
+                        conn.sendall(b"ERROR")
                         print("File access error. Resuming listening for more file names...")
                         continue
                     except Exception as e:
-                        conn.sendall(b"ERRO")
+                        conn.sendall(b"ERROR")
                         print(f"Unexpected exception: {e.message}")
                         continue
                     else:

@@ -3,35 +3,23 @@ import re
 from collections import defaultdict
 
 def count_words(file_name):
-    text_stream = repository.open_file_stream(file_name)
-    word_dict = defaultdict(int)
-    regex = re.compile("\w+")
-    for line in text_stream:
-        #print(f"DEBUG line: {line}")
 
+    #Calling data access layer (repository) to open file.
+    #Raises OSError if file is nonexistent.
+    text_stream = repository.open_file_stream(file_name)
+
+    #Dictionary in which every new key automatically has value = 0
+    word_dict = defaultdict(int)
+
+    #Regex to isolate every word in a text string
+    #Considers compound words (i.e. from the portuguese language) as
+    #well as contracted expressions from english as a single word
+    regex = re.compile("[\w\-']+")
+
+    for line in text_stream:
+        #applies the regex and wraps the resulting words in a list
         words_in_line = regex.findall(line)
-        #print(f"DEBUG words_in_line: {words_in_line}")
         for word in words_in_line:
             word_dict[word.lower()] += 1
     
     return dict(word_dict)
-
-
-# return {
-#     'aaaaa': 10,
-#     'bbbb': 5,
-#     'ccccc': 20,
-#     'ddddd': 30,
-#     'eeee': 1,
-#     'ffff': 7,
-#     'gggg': 8,
-#     'hhh': 1,
-#     'iii': 2,
-#     'jjjj': 5,
-#     'hhhh': 1,
-#     'mmm': 2,
-#     'kkkkkkk': 100,
-#     'zzzzzz': 4,
-#     'ttttt': 9,
-#     'uuuu': 3
-# }
