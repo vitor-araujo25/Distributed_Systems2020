@@ -26,7 +26,7 @@ def start(remote_addr):
         except (KeyboardInterrupt, SystemExit):
             pass
         except Exception as e:
-            print(f"Uncaught exception raised inside UI loop: {e.message}")
+            print(f"Uncaught exception raised inside UI loop: {e}")
         finally:
             print("\nEnding connection...")
             sock.sendall(b"CLOSE")
