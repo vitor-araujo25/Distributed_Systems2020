@@ -1,4 +1,4 @@
-from . import gateway, configs
+import gateway, configs
 
 def main():
     print("Starting server")
