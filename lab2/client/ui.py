@@ -13,7 +13,7 @@ def interaction_loop(sock):
         msg_buf = ""
         while not ALL_MESSAGES_COLLECTED:
             response_json = sock.recv(1024)
-            print(f"DEBUG: msg received: {response_json.decode()}")
+            #print(f"DEBUG: msg received: {response_json.decode()}")
             if response_json.decode() == "ERRO":
                 print("The file you chose appears to not exist. Try again.")
                 break

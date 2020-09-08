@@ -29,16 +29,18 @@ def start(socket_tuple):
                     if not file_name:
                         print("File name reception timed out.")
                         break
-                    if file_name.decode() == "CLOSE":
+                    file_name = file_name.decode()
+                    if file_name == "CLOSE":
                         print("CLOSE received.")
                         break
-                    print(f"File name received: {file_name.decode()}")
+                    print(f"File name received: {file_name}")
                     
                     #invoking word counting method at core layer 
                     try:
                         word_count = core.count_words(file_name)
-                    except OSError:
+                    except OSError as e:
                         conn.sendall(b"ERRO")
+                        print(f"DEBUG: {e}")
                         print("File access error. Resuming listening for more file names...")
                         continue
                     except Exception as e:
