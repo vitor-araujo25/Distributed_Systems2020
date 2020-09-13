@@ -7,6 +7,10 @@ def handle_connection_close(sock, addr):
     print(f"[{threading.current_thread().name}] Connection to {conn_string} closed.")
 
 def socket_setup(socket_tuple):
+    '''
+    Opens a non-blocking TCP socket for listening and returns it.
+    If any error occurs in the socket binding. the program terminates.
+    '''
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(socket_tuple)
     if sock is None:
@@ -18,6 +22,9 @@ def socket_setup(socket_tuple):
     return sock
 
 def client_loop(client_socket, addr):
+    '''
+    Loop responsible for maintaining the entire life-cycle of a client interaction with the server
+    '''
     print(f"[{threading.current_thread().name}] Connection established to {addr[0]}:{addr[1]}")
     while True:
         file_name = client_socket.recv(1024)
@@ -32,15 +39,17 @@ def client_loop(client_socket, addr):
             word_count = core.count_words(file_name)
         except OSError as e:
             client_socket.sendall(b"ERROR")
-            print("File access error. Resuming listening for more file names...")
+            print(f"[{threading.current_thread().name}] File access error. Resuming listening for more file names...")
         except Exception as e:
             client_socket.sendall(b"ERROR")
-            print(f"Unexpected exception: {e}")
+            print(f"[{threading.current_thread().name}] Unexpected exception: {e}")
         else:
             client_socket.sendall(json.dumps(word_count).encode('utf-8'))
 
 def start(conn_tuple):
     SERVER_IS_RUNNING = True
+
+    #keeps track of all open client threads
     RUNNING_THREADS = []
     
     server_socket = socket_setup(conn_tuple)
@@ -56,6 +65,7 @@ def start(conn_tuple):
                         if RUNNING_THREADS:
                             print("There are still clients being served:")
                             print("\n".join([f"{addr[0]}:{addr[1]}" for _, addr in RUNNING_THREADS]))
+                            print("Waiting for clients to disconnect...")
                             for client in RUNNING_THREADS:
                                 client[0].join()
                         SERVER_IS_RUNNING = False
@@ -66,8 +76,11 @@ def start(conn_tuple):
                 elif ready_sock is server:
                     client_socket, remote_addr = server.accept()
                     client_thread = threading.Thread(target=client_loop, args=(client_socket, remote_addr))
+                    client_thread.start() 
+
+                    #registering new client connection as an open thread
                     RUNNING_THREADS.append((client_thread, remote_addr))
-                    client_thread.start()                   
+                                      
 
 def main():
     print("Starting concurrent server")
