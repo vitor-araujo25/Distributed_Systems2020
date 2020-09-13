@@ -1,8 +1,14 @@
 import socket, sys, json, select, threading
 import core, configs
 
+#keeps track of all open client threads
+RUNNING_THREADS = {}
+THREAD_LIST_LOCK = threading.Lock()
+
 def handle_connection_close(sock, addr):
     conn_string = f"{addr[0]}:{addr[1]}"
+    with THREAD_LIST_LOCK:
+        del RUNNING_THREADS[threading.current_thread()]
     sock.close()
     print(f"[{threading.current_thread().name}] Connection to {conn_string} closed.")
 
@@ -47,12 +53,9 @@ def client_loop(client_socket, addr):
             client_socket.sendall(json.dumps(word_count).encode('utf-8'))
 
 def start(conn_tuple):
-    SERVER_IS_RUNNING = True
-
-    #keeps track of all open client threads
-    RUNNING_THREADS = []
-    
+    SERVER_IS_RUNNING = True    
     server_socket = socket_setup(conn_tuple)
+    
     with server_socket as server:
         #main server loop
         while SERVER_IS_RUNNING:
@@ -64,10 +67,10 @@ def start(conn_tuple):
                     if command.upper() == "LEAVE":
                         if RUNNING_THREADS:
                             print("There are still clients being served:")
-                            print("\n".join([f"{addr[0]}:{addr[1]}" for _, addr in RUNNING_THREADS]))
-                            print("Waiting for clients to disconnect...")
-                            for client in RUNNING_THREADS:
-                                client[0].join()
+                            print("\n".join([f"{addr[0]}:{addr[1]}" for _, addr in RUNNING_THREADS.items()]))
+                            print("Waiting for clients to disconnect")
+                            for thread, addr in RUNNING_THREADS.items():
+                                thread.join()
                         SERVER_IS_RUNNING = False
                         break   
                     else:
@@ -77,10 +80,9 @@ def start(conn_tuple):
                     client_socket, remote_addr = server.accept()
                     client_thread = threading.Thread(target=client_loop, args=(client_socket, remote_addr))
                     client_thread.start() 
-
                     #registering new client connection as an open thread
-                    RUNNING_THREADS.append((client_thread, remote_addr))
-                                      
+                    with THREAD_LIST_LOCK:
+                        RUNNING_THREADS[client_thread] = remote_addr                                      
 
 def main():
     print("Starting concurrent server")
