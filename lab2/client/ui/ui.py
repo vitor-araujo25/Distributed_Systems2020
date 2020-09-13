@@ -1,5 +1,4 @@
-import socket
-import json
+import socket, json
 
 def interaction_loop(sock):
     while True:

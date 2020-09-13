@@ -1,6 +1,5 @@
+import sys, socket
 import ui
-import sys
-import socket
 
 HOST = "127.0.0.1"
 PORT = 9000
@@ -17,19 +16,17 @@ def start(remote_addr):
         socket.SOCK_STREAM)
 
     with sock as s:
+        s.connect(remote_addr)
+        conn = s.getpeername()
+        print(f"Connected to {conn[0]}:{conn[1]} successfully.")
         try:
-            s.connect(remote_addr)
-            conn = s.getpeername()
-            print(f"Connected to {conn[0]}:{conn[1]} successfully.")
             ui.interaction_loop(s)
-
         except (KeyboardInterrupt, SystemExit):
             pass
         except Exception as e:
             print(f"Uncaught exception raised inside UI loop: {e}")
         finally:
             print("\nEnding connection...")
-            sock.sendall(b"CLOSE")
 
 if __name__ == "__main__":
     main()

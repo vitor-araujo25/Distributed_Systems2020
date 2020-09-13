@@ -1,6 +1,6 @@
-import repository
 import re
 from collections import defaultdict
+import repository
 
 def count_words(file_name):
 

@@ -1,15 +1,12 @@
-import socket
-import sys
-import core
-import json
-import configs
+import socket, sys, json, select
+import core, configs
 
-sock = socket.socket(
+SOCK = socket.socket(
     socket.AF_INET,
     socket.SOCK_STREAM)
 
 def start(socket_tuple):
-    with sock as s:
+    with SOCK as s:
         s.bind(socket_tuple)
         if s is None:
             print("Error on socket binding")
@@ -27,12 +24,9 @@ def start(socket_tuple):
                 while True:
                     file_name = conn.recv(1024)
                     if not file_name:
-                        print("File name reception timed out.")
+                        print("Connection closed by client.")
                         break
                     file_name = file_name.decode()
-                    if file_name == "CLOSE":
-                        print("CLOSE received.")
-                        break
                     print(f"File name received: {file_name}")
                     
                     #invoking word counting method at core layer 
@@ -44,12 +38,10 @@ def start(socket_tuple):
                         continue
                     except Exception as e:
                         conn.sendall(b"ERROR")
-                        print(f"Unexpected exception: {e.message}")
+                        print(f"Unexpected exception: {e}")
                         continue
                     else:
                         conn.sendall(json.dumps(word_count).encode('utf-8'))
-
-                print(f"Ending connection to {remote_addr[0]}:{remote_addr[1]}")
 
 def main():
     print("Starting server")
