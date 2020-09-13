@@ -69,7 +69,9 @@ def start(conn_tuple):
                             print("There are still clients being served:")
                             print("\n".join([f"{addr[0]}:{addr[1]}" for _, addr in RUNNING_THREADS.items()]))
                             print("Waiting for clients to disconnect")
-                            for thread, addr in RUNNING_THREADS.items():
+                            with THREAD_LIST_LOCK:
+                                active_threads = {k:v for k,v in RUNNING_THREADS.items()}
+                            for thread, addr in active_threads.items():
                                 thread.join()
                         SERVER_IS_RUNNING = False
                         break   
