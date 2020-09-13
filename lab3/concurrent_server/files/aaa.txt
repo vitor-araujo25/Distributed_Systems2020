@@ -1,0 +1,16 @@
+1-
+Será responsabilidade da camada de interface com o usuário fazer a ordenação e qualquer tipo de formatação adicional na lista de palavras contadas.
+A lista de palavras pode ser entregue em um formato de dicionário, com palavras como chaves e sua contagem como valor. A camada de processamento varrerá
+todo o arquivo contando as ocorrências de palavras e devolverá o dicionário completo à interface do usuário, sendo responsabilidade desta última a tarefa 
+de ordenar pelas ocorrências mais frequentes e filtrar apenas as 10 mais frequentes.
+
+
+2-
+O servidor utilizará um dicionário (hashmap) para realizar os cálculos de ocorrência das palavras e responderá uma serialização em utf8 (json) deste objeto para
+o cliente. A segmentação de mensagens será responsabilidade do protocolo TCP, tendo o cliente a responsabilidade de juntar fragmentos do json para processamento
+do objeto completo. A comunicação entre o cliente e servidor se dará no seguinte fluxo: cliente estabelece conexão com o servidor e espera pelo input de um 
+nome de arquivo pelo usuário. Ao ter esse input, envia uma mensagem para o servidor contendo o nome. O servidor recebe este nome e busca o arquivo em uma pasta específica local.
+Caso não encontre, retorna uma mensagem contendo "ERROR". Do contrário, o servidor faz o processamento sobre o arquivo e retorna uma rajada de respostas contendo a lista de palavras em
+sua totalidade. O cliente consome esta lista e faz a filtragem e ordenação, imprimindo as 10 palavras mais frequentes ordenadas na tela e aguardando input do usuário com outro nome de arquivo.
+Obedecendo às especificações, o cliente pode enviar diversos nomes de arquivos antes de terminar a interação com o servidor. Caso digite um nome vazio, a conexão com o servidor será terminada,
+liberando o servidor para atender a outros clientes.
