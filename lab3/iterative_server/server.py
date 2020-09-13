@@ -58,7 +58,7 @@ def start(conn_tuple):
                     if command.upper() == "LEAVE":
                         if CURRENT_CONNECTIONS:
                             print("There are still clients being served:")
-                            print("\n".join([addr for sock, addr in CURRENT_CONNECTIONS.items()]))
+                            print("\n".join([f"{addr[0]}:{addr[1]}" for sock, addr in CURRENT_CONNECTIONS.items()]))
                         else:
                             SERVER_ON = False
                             break    
