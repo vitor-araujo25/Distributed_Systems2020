@@ -3,11 +3,11 @@ import core, configs
 
 #keeps track of all open client threads
 RUNNING_THREADS = {}
-THREAD_LIST_LOCK = threading.Lock()
+THREAD_DICT_LOCK = threading.Lock()
 
 def handle_connection_close(sock, addr):
     conn_string = f"{addr[0]}:{addr[1]}"
-    with THREAD_LIST_LOCK:
+    with THREAD_DICT_LOCK:
         del RUNNING_THREADS[threading.current_thread()]
     sock.close()
     print(f"[{threading.current_thread().name}] Connection to {conn_string} closed.")
@@ -69,8 +69,12 @@ def start(conn_tuple):
                             print("There are still clients being served:")
                             print("\n".join([f"{addr[0]}:{addr[1]}" for _, addr in RUNNING_THREADS.items()]))
                             print("Waiting for clients to disconnect")
-                            with THREAD_LIST_LOCK:
+
+                            #copying the current state of the dict to another variable to avoid a race condition
+                            #whenever another thread changes the RUNNING_THREADS dict
+                            with THREAD_DICT_LOCK:
                                 active_threads = {k:v for k,v in RUNNING_THREADS.items()}
+
                             for thread, addr in active_threads.items():
                                 thread.join()
                         SERVER_IS_RUNNING = False
@@ -83,7 +87,7 @@ def start(conn_tuple):
                     client_thread = threading.Thread(target=client_loop, args=(client_socket, remote_addr))
                     client_thread.start() 
                     #registering new client connection as an open thread
-                    with THREAD_LIST_LOCK:
+                    with THREAD_DICT_LOCK:
                         RUNNING_THREADS[client_thread] = remote_addr                                      
 
 def main():
