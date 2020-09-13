@@ -6,9 +6,11 @@ INWARD_DESCRIPTORS = [sys.stdin]
 SERVER_IS_RUNNING = True
 
 def handle_connection_close(sock):
+    conn_string = f"{CURRENT_CONNECTIONS[sock][0]}{CURRENT_CONNECTIONS[sock][1]}"
     del CURRENT_CONNECTIONS[sock]
     INWARD_DESCRIPTORS.remove(sock)
     sock.close()
+    print(f"Connection to {conn_string} closed.")
 
 def socket_setup(socket_tuple):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -22,15 +24,12 @@ def socket_setup(socket_tuple):
     return sock
 
 def handle_request(client_socket):
-    print(f"Connection established to {CURRENT_CONNECTIONS[client_socket]}")
-    
     file_name = client_socket.recv(1024)
     if not file_name:
-        print(f"Connection closed by {CURRENT_CONNECTIONS[client_socket]}.")
         handle_connection_close(client_socket)
         return
     file_name = file_name.decode()
-    print(f"File name received: {file_name}")
+    print(f"{CURRENT_CONNECTIONS[client_socket][0]}{CURRENT_CONNECTIONS[client_socket][1]} asked for file --> '{file_name}'")
     
     #invoking word counting method at core layer 
     try:
@@ -45,6 +44,8 @@ def handle_request(client_socket):
         client_socket.sendall(json.dumps(word_count).encode('utf-8'))
 
 def start(conn_tuple):
+    global SERVER_IS_RUNNING
+    
     server_socket = socket_setup(conn_tuple)
     with server_socket as server:
         INWARD_DESCRIPTORS.append(server)
@@ -60,12 +61,13 @@ def start(conn_tuple):
                             print("There are still clients being served:")
                             print("\n".join([f"{addr[0]}:{addr[1]}" for sock, addr in CURRENT_CONNECTIONS.items()]))
                         else:
-                            SERVER_ON = False
+                            SERVER_IS_RUNNING = False
                             break    
                 elif ready_sock is server:
                     client_socket, remote_addr = server.accept()
                     INWARD_DESCRIPTORS.append(client_socket)
                     CURRENT_CONNECTIONS[client_socket] = remote_addr
+                    print(f"Connection established to {remote_addr[0]}{remote_addr[1]}")
                 else:
                     handle_request(ready_sock)
 
