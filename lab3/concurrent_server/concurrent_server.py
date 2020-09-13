@@ -4,7 +4,7 @@ import core, configs
 def handle_connection_close(sock, addr):
     conn_string = f"{addr[0]}:{addr[1]}"
     sock.close()
-    print(f"Connection to {conn_string} closed.")
+    print(f"[{threading.current_thread().name}] Connection to {conn_string} closed.")
 
 def socket_setup(socket_tuple):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,7 +57,7 @@ def start(conn_tuple):
                             print("There are still clients being served:")
                             print("\n".join([f"{addr[0]}:{addr[1]}" for _, addr in RUNNING_THREADS]))
                             for client in RUNNING_THREADS:
-                                client.join()
+                                client[0].join()
                         SERVER_IS_RUNNING = False
                         break   
                     else:
@@ -67,8 +67,7 @@ def start(conn_tuple):
                     client_socket, remote_addr = server.accept()
                     client_thread = threading.Thread(target=client_loop, args=(client_socket, remote_addr))
                     RUNNING_THREADS.append((client_thread, remote_addr))
-                    client_thread.start()
-                    
+                    client_thread.start()                   
 
 def main():
     print("Starting concurrent server")
