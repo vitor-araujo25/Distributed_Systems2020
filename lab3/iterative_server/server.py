@@ -6,7 +6,7 @@ INWARD_DESCRIPTORS = [sys.stdin]
 SERVER_IS_RUNNING = True
 
 def handle_connection_close(sock):
-    conn_string = f"{CURRENT_CONNECTIONS[sock][0]}{CURRENT_CONNECTIONS[sock][1]}"
+    conn_string = f"{CURRENT_CONNECTIONS[sock][0]}:{CURRENT_CONNECTIONS[sock][1]}"
     del CURRENT_CONNECTIONS[sock]
     INWARD_DESCRIPTORS.remove(sock)
     sock.close()
@@ -29,7 +29,7 @@ def handle_request(client_socket):
         handle_connection_close(client_socket)
         return
     file_name = file_name.decode()
-    print(f"{CURRENT_CONNECTIONS[client_socket][0]}{CURRENT_CONNECTIONS[client_socket][1]} asked for file --> '{file_name}'")
+    print(f"{CURRENT_CONNECTIONS[client_socket][0]}:{CURRENT_CONNECTIONS[client_socket][1]} asked for file --> '{file_name}'")
     
     #invoking word counting method at core layer 
     try:
@@ -63,16 +63,18 @@ def start(conn_tuple):
                         else:
                             SERVER_IS_RUNNING = False
                             break    
+                    else:
+                        print("Unknown command.")
                 elif ready_sock is server:
                     client_socket, remote_addr = server.accept()
                     INWARD_DESCRIPTORS.append(client_socket)
                     CURRENT_CONNECTIONS[client_socket] = remote_addr
-                    print(f"Connection established to {remote_addr[0]}{remote_addr[1]}")
+                    print(f"Connection established to {remote_addr[0]}:{remote_addr[1]}")
                 else:
                     handle_request(ready_sock)
 
 def main():
-    print("Starting server")
+    print("Starting iterative server")
     addr = (configs.HOST, configs.PORT)
     start(addr)
 
