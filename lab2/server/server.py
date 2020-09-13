@@ -1,22 +1,22 @@
-import socket, sys, json, select
+import socket, sys, json
 import core, configs
 
-SOCK = socket.socket(
-    socket.AF_INET,
-    socket.SOCK_STREAM)
+def socket_setup(socket_tuple):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(socket_tuple)
+    if sock is None:
+        print("Error on socket binding")
+        sys.exit(1)
+    sock.listen()
+    print(f"Listening on port {socket_tuple[1]}...")
+    return sock
 
-def start(socket_tuple):
-    with SOCK as s:
-        s.bind(socket_tuple)
-        if s is None:
-            print("Error on socket binding")
-            sys.exit(1)
-        s.listen()
-        print(f"Listening on port {socket_tuple[1]}...")
-
+def start(conn_tuple):
+    server_socket = socket_setup(conn_tuple)
+    with server_socket as server:
         #main server loop
         while True:
-            conn, remote_addr = s.accept()
+            conn, remote_addr = server.accept()
             with conn:
                 print(f"Connection established to {remote_addr[0]}:{remote_addr[1]}")
 
