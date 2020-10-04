@@ -2,7 +2,6 @@ import sys, socket
 import ui, configs
 
 
-
 def main():
     # if len(sys.argv) != 3:
     #     usage

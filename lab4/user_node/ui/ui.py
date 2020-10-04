@@ -1,12 +1,14 @@
-import socket, json
+import socket, json, select
+import auth.Auth as Auth
 
-def interaction_loop(sock):
+def interaction_loop(server_sock):
     while True:
         ALL_MESSAGES_COLLECTED = False
-        file_name = input("Type the file name: ")
-        if file_name == "":
-            break
-        sock.sendall(file_name.encode())
+        print("Welcome to the chat!")
+        while True:
+            file_name = input("Please type in how you would like to be called: ")
+            Auth.register(file_name)
+
 
         #starting message collection loop
         #If server response is larger than 1024 bytes, segmentation will occur,
