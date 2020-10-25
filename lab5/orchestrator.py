@@ -9,6 +9,8 @@ running_nodes = {}
 HASH_SIZE = 160
 FT_LENGTH = 20
 
+def hash(key: str):
+    return int(hashlib.sha1(str(key).encode()).hexdigest(), 16)
 
 def start_nodes(n: int):
     free_ports = []
@@ -21,26 +23,21 @@ def start_nodes(n: int):
             free_ports.append(sock.getsockname()[1])
 
     #maps chord id's to localhost ports
-    ids_to_ports = {int(hashlib.sha1(str(port).encode()).hexdigest(), 16): port for port in free_ports}
+    ids_to_ports = {hash(port): port for port in free_ports}
     ring = list(ids_to_ports.items())
     ring.sort(key=lambda x: x[0])
 
-    print(ring)
-
     initial_finger_tables = {}
-    for node_id, node_addr in ring:
-        f_table = []
-    
+    for idx, elem in enumerate(ring):
+        node_id, node_addr = elem
+   
         finger = (node_id + 1) % 2**HASH_SIZE
-        current_index = ring.index(lambda x: x[0] == node_id)
-        if current_index == len(ring)-1:
+        if idx == len(ring)-1:
             successor = ring[0]
         else:
-            successor = ring[current_index + 1]
-        f_table.append()
-        initial_finger_tables[node_addr] = f_table
+            successor = ring[idx + 1]
 
-    print(initial_finger_tables)
+        initial_finger_tables[node_addr] = [(finger, successor)]
     
 class ChordNodeService(rpyc.Service):
     def on_connect(self, conn):
