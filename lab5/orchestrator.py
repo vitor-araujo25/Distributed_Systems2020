@@ -3,6 +3,9 @@ import hashlib
 import sys
 import rpyc
 import socket
+from rpyc.utils.server import ThreadedServer
+from rpyc.utils.helpers import classpartial
+import time
 
 running_nodes = {}
 
@@ -38,20 +41,49 @@ def start_nodes(n: int):
             successor = ring[idx + 1]
 
         initial_finger_tables[node_addr] = [(finger, successor)]
+
+    #TODO: start a node process for each port in initial_finger_tables.keys()
+
+    print(initial_finger_tables.keys())
+
+
+    for addr, finger_table in initial_finger_tables.items():
+        p = mp.Process(target=chord_node_main, args=(addr, finger_table))
+        p.start()
+        running_nodes[addr] = p
+    
+    [print(f"localhost:{port}") for port in running_nodes.keys()]
+
+    for addr, process in running_nodes.items():
+        print("attempting join")
+        process.join()
+
+def chord_node_main(port_no: int, f_table):
+    service = classpartial(ChordNodeService, port=port_no, f_table=f_table)
+    server = ThreadedServer(service, port=port_no)
+    server.start()
     
 class ChordNodeService(rpyc.Service):
+
+    def __init__(self, port, f_table):
+        super().__init__()
+        self.finger_table = f_table
+        self.successor = self.finger_table[0]
+        self.id = hash(port)
+
     def on_connect(self, conn):
         pass
 
     def on_disconnect(self, conn):
         pass
+    
+    def exposed_test(self):
+        return "hey"
 
-    class exposed_Node(object):
-        def __init__(self, ):
-            pass
+    def exposed_get_sucessor(self):
+        return self.successor
 
-def chord_node_main(sock):
-    pass
+
 
 if __name__ == "__main__":
     start_nodes(int(sys.argv[1]))
