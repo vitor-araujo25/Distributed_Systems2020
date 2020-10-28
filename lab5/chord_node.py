@@ -12,8 +12,8 @@ class ChordNodeService(rpyc.Service):
         self.exposed_port = port
         self.finger_table = finger_table
         self.ft_length = len(finger_table)
-        self.successor = finger_table[0]["successor"]
-        self.peer = None
+        self.exposed_successor = finger_table[0]["successor"]
+        self.client_conn = None
         self.key_table = {}
 
     def start(self):
@@ -21,59 +21,88 @@ class ChordNodeService(rpyc.Service):
         server.start()
     
     def on_connect(self, conn):
-        self.peer = conn
+        self.client_conn = conn.root
 
     def on_disconnect(self, conn):
-        # self.peer = None
-        pass
+        self.client_conn = None
 
     def closest_preceding_node(self, desired_id: int):
         for i in range(self.ft_length - 1, -1, -1):
-            if self.finger_table[i]["finger"] > self.exposed_node_id and self.finger_table[i]["finger"] < desired_id:
+            finger = self.finger_table[i]["finger"] 
+
+            #modular arithmetic correction
+            finger = finger if finger > self.exposed_node_id else finger + 2**self.ft_length
+            if finger > self.exposed_node_id and finger < desired_id:
                 return self.finger_table[i]["successor"]
         
         return NodeID(node_id=self.exposed_node_id, port=self.exposed_port)
 
     def exposed_find_successor(self, desired_id: int):
-        print(f"id: {desired_id}, n: {self.exposed_node_id}, succ: {self.successor.node_id}")
+        print(f"id: {desired_id}, n: {self.exposed_node_id}, succ: {self.exposed_successor.node_id}")
+        modular_congruent = desired_id
+
+        #modular arithmetic correction
+        if desired_id < self.exposed_node_id:
+            modular_congruent += 2**self.ft_length
     
-        if desired_id > self.exposed_node_id and desired_id <= self.successor.node_id:
+        if modular_congruent > self.exposed_node_id and modular_congruent <= self.exposed_successor.node_id:
             #return my successor
             print("it's my successor!")
-            return self.successor
+            return self.exposed_successor
         else:
-            pred = self.closest_preceding_node(desired_id)
+            pred = self.closest_preceding_node(modular_congruent)
             pred_conn = rpyc.connect("localhost", pred.port)
             return pred_conn.root.find_successor(desired_id)
 
+
     #called from outside the chord ring
-    def exposed_insert_key(self, key, value):
+    def exposed_insert(self, key, value):
         key_hash = sha(key) % 2**self.ft_length
-        self.exposed_insert_hash(key_hash)
+        #FAZER ASYNC!!!
+        self.exposed_insert_hash(key, key_hash, value)
 
     #for use exclusively within the chord ring
-    def exposed_insert_hash(self, key_hash, value):    
+    def exposed_insert_hash(self, key, key_hash, value):    
         if key_hash == self.exposed_node_id:
-            self.key_table[key_hash] = value
+            print(f"[Node {self.exposed_node_id}] Inserted ('{key}', '{value}') here!")
+            self.key_table[key] = value
+        elif key_hash == self.exposed_successor.node_id:
+            s = rpyc.connect("localhost", port=self.exposed_successor.port)
+            s.root.insert_hash(key, key_hash, value)
+            s.close()
         else:
             succ_obj = self.exposed_find_successor(key_hash)
             s = rpyc.connect("localhost", port=succ_obj.port)
-            s.root.insert_hash(key_hash, value)
+            s.root.insert_hash(key, key_hash, value)
+            s.close()
 
-    def exposed_search(self, key, search_id):
+    def exposed_lookup(self, key, search_id):
         key_hash = sha(key) % 2**self.ft_length
-        self.exposed_search_internal(self.conn, key_hash, search_id)
+        #FAZER ASYNC!!!
+        self.exposed_lookup_internal(self.client_conn, key, key_hash, search_id)
 
-    def exposed_search_internal(self, client_ref, key_hash, search_id):
+    def exposed_lookup_internal(self, client_ref, key, key_hash, search_id):
         if key_hash == self.exposed_node_id:
-            value = self.key_table[key_hash]
-            client_ref.root.search_response(value, search_id)
+            value = self.key_table.get(key)
+
+            #TODO: solve buggy connection. do it by passing port number as parameter if need be
+            client_ref.lookup_response(key, value, search_id)
+            
+        elif key_hash == self.exposed_successor.node_id:
+            s = rpyc.connect("localhost", port=self.exposed_successor.port)
+            s.root.lookup_internal(client_ref, key, key_hash, search_id)
+            s.close()
         else:
             succ_obj = self.exposed_find_successor(key_hash)
             s = rpyc.connect("localhost", port=succ_obj.port)
-            s.root.search_internal(client_ref, key_hash, search_id)
+            s.root.lookup_internal(client_ref, key, key_hash, search_id)
+            s.close()
 
-        
+    #for debugging
+    def exposed_show_info(self):
+        return (f"{{'node_id': {self.exposed_node_id},\n'finger_table': {self.finger_table}\n"
+                f"'key_table': {self.key_table}}}")
+
 
 
     
