@@ -18,6 +18,7 @@ class ClientService(rpyc.Service):
         self.TRACKER_PORT = tracker_port
         self.PORT = client_port
         self.tracker = rpyc.connect("localhost", port=tracker_port)
+        self.origin_node = self.get_chord_node_addr()
         self.ongoing_lookups = {}
 
     def start(self):
@@ -28,15 +29,13 @@ class ClientService(rpyc.Service):
         return self.tracker.root.get_random_node()
 
     def exposed_insert_key(self, key, value):
-        origin_node_port = self.get_chord_node_addr()
         # print(f"Using node at localhost:{origin_node_port}")
-        chord_connection = rpyc.connect("localhost", port=origin_node_port)
+        chord_connection = rpyc.connect("localhost", port=self.origin_node)
         chord_connection.root.insert(key, value)
 
     def exposed_lookup_key(self, key):
-        origin_node_port = self.get_chord_node_addr()
         # print(f"Using node at localhost:{origin_node_port}")
-        chord_connection = rpyc.connect("localhost", port=origin_node_port)
+        chord_connection = rpyc.connect("localhost", port=self.origin_node)
         search_id = uuid.uuid4().hex
         self.ongoing_lookups[search_id] = key
         print(f"SearchID: {search_id}")
@@ -50,8 +49,9 @@ class ClientService(rpyc.Service):
         del self.ongoing_lookups[search_id]
 
     #for debugging
-    def exposed_reconnect_to_tracker(self):
+    def exposed_find_new_origin(self):
         self.tracker = rpyc.connect("localhost", port=self.TRACKER_PORT)
+        self.origin_node = self.get_chord_node_addr()
 
 
 def usage_instructions():
@@ -104,5 +104,10 @@ if __name__ == "__main__":
             print(f"Wrong parameters for '{command}' operation.")
         except InvalidCommandException:
             print(f"Command '{command}' is unknown.")
+        except (ConnectionRefusedError, ConnectionResetError, ConnectionError, ConnectionAbortedError):
+            print("It seems that we've had a network error and were unable to reconnect to DHT ring.")
+            print("Quitting...")
+            sys.exit()
+            break
 
     # CLIENT_CONNECTION.close()
