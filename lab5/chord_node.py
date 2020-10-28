@@ -59,6 +59,20 @@ class ChordNodeService(rpyc.Service):
             succ_obj = self.exposed_find_successor(key_hash)
             s = rpyc.connect("localhost", port=succ_obj.port)
             s.root.insert_hash(key_hash, value)
+
+    def exposed_search(self, key, search_id):
+        key_hash = sha(key) % 2**self.ft_length
+        self.exposed_search_internal(self.conn, key_hash, search_id)
+
+    def exposed_search_internal(self, client_ref, key_hash, search_id):
+        if key_hash == self.exposed_node_id:
+            value = self.key_table[key_hash]
+            client_ref.root.search_response(value, search_id)
+        else:
+            succ_obj = self.exposed_find_successor(key_hash)
+            s = rpyc.connect("localhost", port=succ_obj.port)
+            s.root.search_internal(client_ref, key_hash, search_id)
+
         
 
 
