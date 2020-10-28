@@ -76,26 +76,27 @@ class ChordNodeService(rpyc.Service):
             s.root.insert_hash(key, key_hash, value)
             s.close()
 
-    def exposed_lookup(self, key, search_id):
+    def exposed_lookup(self, key, search_id, client_port):
         key_hash = sha(key) % 2**self.ft_length
         #FAZER ASYNC!!!
-        self.exposed_lookup_internal(self.client_conn, key, key_hash, search_id)
+        self.exposed_lookup_internal(self.client_conn, key, key_hash, search_id, client_port)
 
-    def exposed_lookup_internal(self, client_ref, key, key_hash, search_id):
+    def exposed_lookup_internal(self, client_ref, key, key_hash, search_id, client_port):
         if key_hash == self.exposed_node_id:
             value = self.key_table.get(key)
 
             #TODO: solve buggy connection. do it by passing port number as parameter if need be
-            client_ref.lookup_response(key, value, search_id)
+            client_conn = rpyc.connect("localhost", client_port)
+            client_conn.root.lookup_response(value, search_id)
             
         elif key_hash == self.exposed_successor.node_id:
             s = rpyc.connect("localhost", port=self.exposed_successor.port)
-            s.root.lookup_internal(client_ref, key, key_hash, search_id)
+            s.root.lookup_internal(client_ref, key, key_hash, search_id, client_port)
             s.close()
         else:
             succ_obj = self.exposed_find_successor(key_hash)
             s = rpyc.connect("localhost", port=succ_obj.port)
-            s.root.lookup_internal(client_ref, key, key_hash, search_id)
+            s.root.lookup_internal(client_ref, key, key_hash, search_id, client_port)
             s.close()
 
     #for debugging
