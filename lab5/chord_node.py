@@ -1,102 +1,66 @@
 import time, rpyc
 from typing import Tuple
+from rpyc.utils.server import ThreadedServer
+from utils import sha, NodeID
 
 class ChordNodeService(rpyc.Service):
     
-    FT_LENGTH = 20
-    HASH_SIZE = 160
-
-    def __init__(self, port, bootstrap_node):
+    def __init__(self, port, node_id, finger_table):
         super().__init__()
-        #array containing objects of the format (finger, (id_successor, port_successor))
-        print(f"starting on port: {port}, bootstrap: {bootstrap_node}")
-        self.exposed_id = hash(port)
+        print(f"starting node [{node_id}] on port: {port}\nfinger_table: {finger_table}")
+        self.exposed_node_id = node_id
         self.exposed_port = port
-        self.next_finger = 0
-        
-        #creating chord ring from scratch
-        if bootstrap_node is None:
-            self.exposed_successor = (self.exposed_id, self.exposed_port) #NÃO FAZ SENTIDO!!!
-        
-        #joining chord ring from a known bootstrap node
-        else:    
-            entry_node = rpyc.connect("localhost", bootstrap_node)
-            self.exposed_successor = entry_node.root.find_successor(self.exposed_id)
+        self.finger_table = finger_table
+        self.ft_length = len(finger_table)
+        self.successor = finger_table[0]["successor"]
+        self.peer = None
+        self.key_table = {}
 
-        self.exposed_predecessor = None
-        self.finger_table = [None]*self.FT_LENGTH
-        self.finger_table[0] = {"finger": (self.exposed_id+1) % 2**self.HASH_SIZE, "successor": self.exposed_successor}
-
-        # threading.Thread(target=self.housekeeping).start()
-
+    def start(self):
+        server = ThreadedServer(self, port=self.exposed_port, protocol_config={"allow_public_attrs": True})
+        server.start()
+    
     def on_connect(self, conn):
-        pass
+        self.peer = conn
 
     def on_disconnect(self, conn):
+        # self.peer = None
         pass
 
-    def housekeeping(self):
-        while True:
-            time.sleep(0.25)
-            # with self.lock:
-            self.fix_fingers()
-            self.stabilize()
-
-    def stabilize(self):
-        conn = rpyc.connect("localhost", self.exposed_successor[1])
-        x: Tuple[int, int] = conn.root.predecessor
-        if x is not None and (x[0] > self.exposed_id and x[0] < self.exposed_successor[0]):
-            self.exposed_successor = x
-
-        #repetition is necessary, as the previous step could have changed the successor, invalidating the connection
-        conn = rpyc.connect("localhost", self.exposed_successor[1])
-        conn.root.notify((self.exposed_id, self.exposed_port))
-
-    def fix_fingers(self):
-        self.next_finger += 1
-        if self.next_finger >= self.FT_LENGTH:
-            self.next_finger = 0
-        finger = (self.exposed_id + 2**self.next_finger) % 2**self.HASH_SIZE
-        print(f"next finger: {self.next_finger}")
-        successor = self.exposed_find_successor(finger)
-        # with self.lock:
-        self.finger_table[self.next_finger] = {
-            "finger": finger, 
-            "successor": successor
-        }
-    
-    def exposed_notify(self, node: Tuple[int, int]):
-        if self.exposed_predecessor is None or (node[0] > self.exposed_predecessor[0] and node[0] < self.exposed_id):
-            self.exposed_predecessor = node
-
-    # def expand_finger_table(self):
-    #     peer = rpyc.connect("localhost", self.exposed_successor[1])
-    #     for i in range(1, self.FT_LENGTH):
-    #         finger = (self.exposed_id + 2**i) % 2**HASH_SIZE
-    #         ith_finger_successor = peer.root.find_successor(finger)
-    #         self.finger_table.append((finger, ith_finger_successor))
-    #     self.stable = True
-
-    def closest_preceding_node(self, id: int) -> Tuple[int, int]:
-        for i in range(self.FT_LENGTH - 1, -1, -1):
-            if self.finger_table[i] is None: continue
-            if self.finger_table[i]["finger"] > self.exposed_id and self.finger_table[i]["finger"] < id:
+    def closest_preceding_node(self, desired_id: int):
+        for i in range(self.ft_length - 1, -1, -1):
+            if self.finger_table[i]["finger"] > self.exposed_node_id and self.finger_table[i]["finger"] < desired_id:
                 return self.finger_table[i]["successor"]
         
-        return (self.exposed_id, self.exposed_port)
+        return NodeID(node_id=self.exposed_node_id, port=self.exposed_port)
 
-    def exposed_find_successor(self, id: int) -> Tuple[int, int]:
-        # with self.lock:
-        print(f"id: {id}, n: {self.exposed_id}, succ: {self.exposed_successor}")
+    def exposed_find_successor(self, desired_id: int):
+        print(f"id: {desired_id}, n: {self.exposed_node_id}, succ: {self.successor.node_id}")
     
-        if id > self.exposed_id and id <= self.exposed_successor[0]:
-            return self.exposed_successor
+        if desired_id > self.exposed_node_id and desired_id <= self.successor.node_id:
+            #return my successor
+            print("it's my successor!")
+            return self.successor
         else:
-            pred = self.closest_preceding_node(id)
-            peer = rpyc.connect("localhost", pred[1])
-            return peer.root.find_successor(id)
-            
+            pred = self.closest_preceding_node(desired_id)
+            pred_conn = rpyc.connect("localhost", pred.port)
+            return pred_conn.root.find_successor(desired_id)
 
-    def exposed_test(self):
-        return "hey"
+    #called from outside the chord ring
+    def exposed_insert_key(self, key, value):
+        key_hash = sha(key) % 2**self.ft_length
+        self.exposed_insert_hash(key_hash)
+
+    #for use exclusively within the chord ring
+    def exposed_insert_hash(self, key_hash, value):    
+        if key_hash == self.exposed_node_id:
+            self.key_table[key_hash] = value
+        else:
+            succ_obj = self.exposed_find_successor(key_hash)
+            s = rpyc.connect("localhost", port=succ_obj.port)
+            s.root.insert_hash(key_hash, value)
         
+
+
+    
+            
