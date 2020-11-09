@@ -37,7 +37,9 @@ class ReplicaNode(rpyc.Service):
             with self.W_LOCK:
                 self.__updateX(value)
         
-        #async propagate changes
+        #async propagate changes and history
+        #TODO: figure out how to update history and changes
+        
         #respond success
 
     def __updateX(self, value):
@@ -66,6 +68,9 @@ class ReplicaNode(rpyc.Service):
 
     def exposed_set_debug(self, state):
         self.DEBUG_MODE = state
+
+    def exposed_get_history(self):
+        return self.history
 
 def node_start(node_instance):
     node_instance.start()
@@ -116,7 +121,8 @@ if __name__ == "__main__":
             
             elif command == "history":
                 assert param_count == 0
-                #TODO: read history from replica
+                history_data = replica.root.get_history()
+                print_formatted_history(history_data)
             
             elif command == "set":
                 assert param_count == 1
@@ -126,7 +132,6 @@ if __name__ == "__main__":
 
             elif command == "quit":
                 assert param_count == 0
-                replica_process.terminate()
                 raise KeyboardInterrupt
 
             elif command in ("help", "?"):
@@ -149,7 +154,8 @@ if __name__ == "__main__":
             print(f"Wrong parameters for command '{command}'. Please check instructions by running 'help'.")
         except InvalidCommandException:
             print(f"Command '{command}' is unknown.")
-        except KeyboardInterrupt:
-            print("Quitting...")
+        except (KeyboardInterrupt, EOFError):
+            print("\nQuitting...")
+            replica_process.terminate()
             sys.exit(0)
             
