@@ -2,19 +2,68 @@ import rpyc, sys
 from rpyc.utils.server import ThreadedServer
 from typing import List, Tuple
 import multiprocessing as mp
+from threading import RLock, Event
 import time
 from utils import *
 
 #defined by project specification
 N = 4
 
+#TODO: add logging lib and enable debug mode via client command
+
 class ReplicaNode(rpyc.Service):
     def __init__(self, my_id):
         self.id = my_id
         self.X = 0
         self.can_write = True if self.id == 1 else False
-        self.peer_ports = [5000+i for i in range(1,N+1) if i != self.id]
-        self.update_history: List[Tuple[int, int]] = []
+        self.peer_connections = [5000+i for i in range(1,N+1) if i != self.id]
+        self.history: List[Tuple[int, int]] = []
+        self.W_LOCK = RLock()
+        self.permission_granted_event = Event()
+
+    def exposed_read(self):
+        return self.X
+
+    def exposed_set(self, value):
+        self.W_LOCK.acquire()
+        if self.can_write:
+            self.__updateX(value)
+            self.W_LOCK.release()
+        else:
+            self.W_LOCK.release()
+            self.request_write()
+
+            self.permission_granted_event.wait()
+            self.permission_granted_event.clear()
+            with self.W_LOCK:
+                self.__updateX(value)
+        
+        #async propagate changes
+        #respond success
+
+    def __updateX(self, value):
+        self.X = value
+        self.history.append((self.id, value))
+
+    def set_write(self, primary_id):
+        print(f"Permission granted by replica {primary_id}")
+        with self.W_LOCK:
+            self.can_write = True
+            self.permission_granted_event.set()
+
+    def request_write(self):
+        #assumes replicas will never fail and will all be available when requested
+        for port in self.peer_connections:
+            conn = rpyc.connect("localhost", port=port)
+            conn.root.ask_for_write_permission(self.set_write)
+
+    def exposed_ask_for_write_permission(self, callback):
+        with self.W_LOCK:
+            if self.can_write:
+                self.can_write = False
+                cb = rpyc.async_(callback)
+                cb(self.id)
+
 
 def node_start(node_instance):
     #TODO: define signal handler that calls node_instance.stop()
@@ -59,6 +108,8 @@ if __name__ == "__main__":
             if command == "read":
                 assert param_count == 0
                 #read X from replica
+                value = replica.root.read()
+                print(f"X = {value}")
             
             elif command == "history":
                 assert param_count == 0
@@ -69,6 +120,7 @@ if __name__ == "__main__":
                 assert is_int_coercible(params[0])
                 value = int(params[0])
                 #write value to X in current replica
+                replica.root.set(value)
 
             elif command == "quit":
                 assert param_count == 0
