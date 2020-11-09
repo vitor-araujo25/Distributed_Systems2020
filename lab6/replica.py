@@ -9,7 +9,7 @@ from utils import *
 N = 4
 BASE_PORT = 5000
 class ReplicaNode(rpyc.Service):
-    def __init__(self, my_id):
+    def __init__(self, my_id: int):
         self.id = my_id
         self.X = 0
         self.can_write = True if self.id == 1 else False
@@ -22,7 +22,7 @@ class ReplicaNode(rpyc.Service):
     def exposed_read(self):
         return self.X
 
-    def exposed_set(self, value):
+    def exposed_set(self, value: int):
         self.W_LOCK.acquire()
         if self.can_write:
             self.__updateX(value)
@@ -42,13 +42,13 @@ class ReplicaNode(rpyc.Service):
         
         #respond success
 
-    def __updateX(self, value):
+    def __updateX(self, value: int):
         self.X = value
         self.history.append((self.id, value))
 
-    def set_write(self, primary_id):
+    def set_write(self, primary_id: int):
         if self.DEBUG_MODE:
-            print(f"Permission granted by replica {primary_id}")
+            print(f"[DEBUG] Permission granted by replica {primary_id}")
         with self.W_LOCK:
             self.can_write = True
             self.permission_granted_event.set()
@@ -63,14 +63,17 @@ class ReplicaNode(rpyc.Service):
         with self.W_LOCK:
             if self.can_write:
                 self.can_write = False
-                cb = rpyc.async_(callback)
-                cb(self.id)
+                set_write_callback = rpyc.async_(callback)
+                set_write_callback(self.id)
 
-    def exposed_set_debug(self, state):
+    def exposed_set_debug(self, state: bool):
         self.DEBUG_MODE = state
 
     def exposed_get_history(self):
         return self.history
+
+def usage():
+    print(f"usage: python replica.py ID\n\tID - integer value in the range [1,{N}] containing the id of the replica.")
 
 def node_start(node_instance):
     node_instance.start()
@@ -113,7 +116,6 @@ if __name__ == "__main__":
             params = user_input[1:]
             param_count = len(params)
 
-        
             if command == "read":
                 assert param_count == 0
                 value = replica.root.read()
@@ -135,14 +137,19 @@ if __name__ == "__main__":
                 raise KeyboardInterrupt
 
             elif command in ("help", "?"):
-                assert param_count == 0
-                #TODO: write well-formatted help text
-                print_help()
+                assert param_count <= 1
+                try:
+                    help_command = params[0]
+                    command = help_command  #quick fix for printing the consulted command if it doesn't exist
+                except IndexError:
+                    help_command = None
+                print_help(help_command)
 
             elif command == "debug":
                 assert param_count == 1
                 assert params[0].lower() in ("on", "off")
                 replica.root.set_debug(debug_dict.get(params[0].lower()))
+                print(f"[DEBUG MODE IS {params[0].upper()}]")
 
             elif command == "":
                 continue
@@ -151,7 +158,7 @@ if __name__ == "__main__":
                 raise InvalidCommandException
 
         except AssertionError:
-            print(f"Wrong parameters for command '{command}'. Please check instructions by running 'help'.")
+            print(f"Wrong parameters for command '{command}'. Please check instructions by running 'help {command}'.")
         except InvalidCommandException:
             print(f"Command '{command}' is unknown.")
         except (KeyboardInterrupt, EOFError):
