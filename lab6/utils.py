@@ -6,7 +6,6 @@ def is_int_coercible(text):
         return False
         
 def print_help():
-    #TODO: write well-formatted help text
     print(f"help!")
     
 def usage():
