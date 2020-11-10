@@ -202,12 +202,7 @@ if __name__ == "__main__":
                 assert param_count == 0
                 value = replica.root.read()
                 print(f"X = {value}")
-            
-            elif command == "history":
-                assert param_count == 0
-                history_data = replica.root.get_history()
-                print_formatted_history(history_data)
-            
+
             elif command == "set":
                 assert param_count == 1
                 assert is_int_coercible(params[0])
@@ -221,14 +216,20 @@ if __name__ == "__main__":
                         break
                 else:
                     print(f"Value {value} registered. Send 'commit' to propagate this write or perform other operations.")
+                
+            elif command == "history":
+                assert param_count == 0
+                history_data = replica.root.get_history()
+                print_formatted_history(history_data)
             
             elif command == "commit":
                 assert param_count == 0
                 replica.root.commit_changes()
 
-            elif command == "quit":
+            elif command == "status":
                 assert param_count == 0
-                raise KeyboardInterrupt
+                replica_status = replica.root.get_status()
+                print_formatted_status_data(replica_status)        
 
             elif command in ("help", "?"):
                 assert param_count <= 1
@@ -245,11 +246,10 @@ if __name__ == "__main__":
                 replica.root.set_debug(debug_dict.get(params[0].lower()))
                 print(f"[DEBUG MODE IS {params[0].upper()}]")
 
-            elif command == "status":
+            elif command == "quit":
                 assert param_count == 0
-                replica_status = replica.root.get_status()
-                print_formatted_status_data(replica_status)
-
+                raise KeyboardInterrupt
+            
             elif command == "":
                 continue
 
