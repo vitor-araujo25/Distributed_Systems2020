@@ -34,6 +34,10 @@ def print_formatted_history(history):
         replica_id, value = elem
         print(f"{idx+1}: Replica {replica_id} -> X = {value}")
     print("-----------------------------------")
+
+def debug(debug_on, *args, **kwargs):
+    if debug_on:
+        print(*args, **kwargs)
     
 class InvalidCommandException(Exception):
     pass

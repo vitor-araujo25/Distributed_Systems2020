@@ -15,62 +15,105 @@ class ReplicaNode(rpyc.Service):
         self.can_write = True if self.id == 1 else False
         self.peer_connections = [BASE_PORT+i for i in range(1,N+1) if i != self.id]
         self.history: List[Tuple[int, int]] = []
-        self.W_LOCK = RLock()
+        self.uncommitted_history: List[Tuple[int, int]] = []
+        self.LOCK = RLock()
         self.permission_granted_event = Event()
         self.DEBUG_MODE = False
+        self.changes_committed = True
 
     def exposed_read(self):
         return self.X
-
-    def exposed_set(self, value: int):
-        self.W_LOCK.acquire()
-        if self.can_write:
-            self.__updateX(value)
-            self.W_LOCK.release()
-        else:
-            self.W_LOCK.release()
-            
-            self.request_write()
-
-            self.permission_granted_event.wait()
-            self.permission_granted_event.clear()
-            with self.W_LOCK:
-                self.__updateX(value)
         
-        #async propagate changes and history
-        #TODO: figure out how to update history and changes
-        
-        #respond success
-
-    def __updateX(self, value: int):
-        self.X = value
-        self.history.append((self.id, value))
-
-    def set_write(self, primary_id: int):
-        if self.DEBUG_MODE:
-            print(f"[DEBUG] Permission granted by replica {primary_id}")
-        with self.W_LOCK:
-            self.can_write = True
-            self.permission_granted_event.set()
-
-    def request_write(self):
-        #assumes replicas will never fail and will all be available when requested
-        for port in self.peer_connections:
-            conn = rpyc.connect("localhost", port=port)
-            conn.root.ask_for_write_permission(self.set_write)
-
-    def exposed_ask_for_write_permission(self, callback):
-        with self.W_LOCK:
-            if self.can_write:
-                self.can_write = False
-                set_write_callback = rpyc.async_(callback)
-                set_write_callback(self.id)
-
     def exposed_set_debug(self, state: bool):
         self.DEBUG_MODE = state
 
     def exposed_get_history(self):
         return self.history
+
+    def exposed_set(self, value: int):
+        self.LOCK.acquire()
+        if self.can_write:
+            self.__updateX(value)
+            self.LOCK.release()
+        else:
+            self.LOCK.release()
+            
+            self.request_write()
+
+            #wait for 1 second and try requesting again
+            while not self.permission_granted_event.wait(1.0):
+                self.request_write()
+            
+            with self.LOCK:
+                self.permission_granted_event.clear()
+                self.__updateX(value)
+        
+        #respond success!!
+
+
+    def request_write(self):
+        #assumes replicas will never fail and will all be available when requested
+        #TODO: handle possible errors in a better fashion
+        for port in self.peer_connections:
+            conn = rpyc.connect("localhost", port=port)
+            ask_for_permission_async = rpyc.async_(conn.root.ask_for_write_permission)
+            async_result = ask_for_permission_async()
+            async_result.add_callback(self.set_write)
+            
+    def set_write(self, async_result):
+        primary_id, permission_granted = async_result.value
+        debug(self.DEBUG_MODE, f"[DEBUG] Replica {primary_id} has the hat!")
+        if permission_granted:
+            with self.LOCK:
+                self.can_write = True
+                self.permission_granted_event.set()
+    
+    def exposed_ask_for_write_permission(self):
+        with self.LOCK:
+            #check if local changes are committed
+            if self.can_write and self.changes_committed:
+                self.can_write = False
+                return (self.id, True)
+            return (self.id, False)
+    
+    def exposed_commit_changes(self):
+        with self.LOCK:
+            if not self.changes_committed:
+                self.broadcast_updates()
+                self.uncommitted_history = []
+                self.changes_committed = True
+    
+    def broadcast_updates(self):
+        #assumes replicas will never fail and will all be available when requested
+        #TODO: handle possible errors in a better fashion
+        confirmations = [False for peer in self.peer_connections]
+        while not all(confirmations):
+            requests_in_flight = []
+
+            for i in range(len(self.peer_connections)):
+                if confirmations[i] == False:
+                    port = self.peer_connections[i]
+                    conn = rpyc.connect("localhost", port=port)
+                    replicate_changes_async = rpyc.async_(conn.root.replicate_changes)
+                    async_request = (i, replicate_changes_async(self.id, self.X, self.uncommitted_history))
+                    requests_in_flight.append(async_request)
+
+            for confirmation_id, async_request in requests_in_flight:
+                confirmations[confirmation_id] = async_request.value
+
+    def exposed_replicate_changes(self, primary_id, new_X, new_changes):
+        debug(self.DEBUG_MODE, f"[DEBUG] received push containing value {new_X} from replica {primary_id}!")
+        with self.LOCK:
+            self.X = new_X
+            self.history.extend(new_changes)
+        return True
+
+    def __updateX(self, value: int):
+        self.X = value
+        history_entry = (self.id, value)
+        self.history.append(history_entry)
+        self.uncommitted_history.append(history_entry)
+        self.changes_committed = False
 
 def usage():
     print(f"usage: python replica.py ID\n\tID - integer value in the range [1,{N}] containing the id of the replica.")
@@ -131,6 +174,10 @@ if __name__ == "__main__":
                 assert is_int_coercible(params[0])
                 value = int(params[0])
                 replica.root.set(value)
+            
+            elif command == "commit":
+                assert param_count == 0
+                replica.root.commit_changes()
 
             elif command == "quit":
                 assert param_count == 0
