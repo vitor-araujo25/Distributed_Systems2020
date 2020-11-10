@@ -13,3 +13,5 @@ The projects are incrementally distributed among several assignments, for each f
     - This assignment directly extends the previous, enhancing the server logic by making two versions of it: a better iterative one and a concurrent one. The iterative now gains the ability to handle connections with multiple clients (although the processing itself is still blocking), whereas the concurrent implementation is, as the name implies, fully concurrent, doing the processing in another thread for each new client.
 - lab5
     - Implementation of a simplified version of the Distributed Hash Table (DHT) algorithm "Chord". The Chord nodes are spun up and kept track of by an orchestrator, which simplifies the dynamic nature of the algorithm.
+- lab6
+    - A simplified primary-based data replication protocol, in which each of the clients can write to a local replica that stores an integer value X. That write can then be committed, replicating the value and the change history across all replicas, maintaining sequential consistency eventually. The implementation uses the RPyC library, making heavy use of asynchronous calls between replicas.
