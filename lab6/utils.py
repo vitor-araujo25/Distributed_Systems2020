@@ -35,6 +35,12 @@ def print_formatted_history(history):
         print(f"{idx+1}: Replica {replica_id} -> X = {value}")
     print("---------------------------")
 
+def print_formatted_status_data(status_data):
+    print("---------------------------")
+    for k,v in status_data.items():
+        print(f"{k}: {v}")
+    print("---------------------------")
+
 def debug(debug_on, *args, **kwargs):
     if debug_on:
         # print("") #inserting newline

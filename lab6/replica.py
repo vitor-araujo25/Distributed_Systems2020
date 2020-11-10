@@ -30,6 +30,14 @@ class ReplicaNode(rpyc.Service):
     def exposed_get_history(self):
         return self.history
 
+    def exposed_get_status(self):
+        return {
+            "Replica ID": self.id, 
+            "Changes committed": self.changes_committed,
+            "Primary (has token)": self.can_write,
+            "Debug mode": self.DEBUG_MODE
+        }
+
     def exposed_set(self, value: int):
 
         BACKOFF_LIMIT = 6
@@ -82,15 +90,16 @@ class ReplicaNode(rpyc.Service):
     def set_write(self, async_result):
         primary_id, had_token, permission_granted = async_result.value
         if had_token:
-            debug(self.DEBUG_MODE, f"[DEBUG] Replica {primary_id} had the write token ")
+            debug_sentence = f"[DEBUG] Replica {primary_id} had the write token "
             if permission_granted:
-                debug(self.DEBUG_MODE, "and granted it!")
+                debug_sentence += "and granted it!"
                 with self.LOCK:
                     self.can_write = True
                     self.permission_granted_event.set()
             else:
-                debug(self.DEBUG_MODE, f"and did not grant it! Mean replica {primary_id}! :(")
-    
+                debug_sentence += f"and did not grant it! Mean replica {primary_id}! :("
+            debug(self.DEBUG_MODE, debug_sentence)
+
     def exposed_ask_for_write_permission(self):
         with self.LOCK:
             #check if local changes are committed
@@ -127,7 +136,7 @@ class ReplicaNode(rpyc.Service):
                 confirmations[confirmation_id] = ar_obj.value
 
     def exposed_replicate_changes(self, primary_id, new_X, new_changes):
-        debug(self.DEBUG_MODE, f"[DEBUG] Received push from replica {primary_id} containing value {new_X} as a result of {len(new_changes)}")
+        debug(self.DEBUG_MODE, f"[DEBUG] Received push from replica {primary_id} containing value {new_X} as a result of {len(new_changes)} new change(s)")
         with self.LOCK:
             self.X = new_X
             self.history.extend(new_changes)
@@ -165,7 +174,11 @@ if __name__ == "__main__":
     
     #setting up replica node
     #logger definition is meant to disable annoying prints made by the RPC lib when the server is interrupted
-    replica_node = ThreadedServer(ReplicaNode(replica_id), port=local_replica_port, logger=logging.getLogger().setLevel(logging.CRITICAL))
+    replica_node = ThreadedServer(ReplicaNode(replica_id), 
+                                  port=local_replica_port,
+                                  logger=logging.getLogger().setLevel(logging.CRITICAL), 
+                                  protocol_config={"allow_public_attrs": True})
+    
     replica_process = mp.Process(target=node_start, args=(replica_node,))
     replica_process.start()
 
@@ -231,6 +244,11 @@ if __name__ == "__main__":
                 assert params[0].lower() in ("on", "off")
                 replica.root.set_debug(debug_dict.get(params[0].lower()))
                 print(f"[DEBUG MODE IS {params[0].upper()}]")
+
+            elif command == "status":
+                assert param_count == 0
+                replica_status = replica.root.get_status()
+                print_formatted_status_data(replica_status)
 
             elif command == "":
                 continue
