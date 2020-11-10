@@ -29,14 +29,15 @@ def print_help(command=None):
         raise InvalidCommandException
 
 def print_formatted_history(history):
-    print("-----------------------------------")
+    print("---------------------------")
     for idx, elem in enumerate(history):
         replica_id, value = elem
         print(f"{idx+1}: Replica {replica_id} -> X = {value}")
-    print("-----------------------------------")
+    print("---------------------------")
 
 def debug(debug_on, *args, **kwargs):
     if debug_on:
+        # print("") #inserting newline
         print(*args, **kwargs)
     
 class InvalidCommandException(Exception):
